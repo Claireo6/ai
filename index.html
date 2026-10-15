@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我們的小帳本</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #F5EFE6;
+    --card: rgba(255, 253, 249, 0.6);
+    --card-solid: #FFFDF9;
+    --glass-border: rgba(255, 255, 255, 0.65);
+    --blob1: rgba(192, 133, 82, 0.35);
+    --blob2: rgba(139, 94, 60, 0.22);
+    --blob3: rgba(232, 195, 158, 0.55);
+    --text: #3E2C23;
+    --muted: #8A7666;
+    --primary: #8B5E3C;
+    --primary-text: #FFFDF9;
+    --accent: #C08552;
+    --accent-soft: #F3E3D3;
+    --danger: #B5523B;
+    --line: #E6DACB;
+    --input-bg: rgba(245, 239, 230, 0.7);
+    --settle-bg: rgba(239, 231, 220, 0.45);
+    --colorA: #3B6FB6;
+    --colorB: #E07B39;
+    --shadow: 0 4px 16px rgba(62, 44, 35, 0.08);
+    --radius: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1F1814;
+      --card: rgba(43, 34, 28, 0.55);
+      --card-solid: #2B221C;
+      --glass-border: rgba(255, 255, 255, 0.07);
+      --blob1: rgba(201, 145, 95, 0.22);
+      --blob2: rgba(139, 94, 60, 0.25);
+      --blob3: rgba(212, 163, 115, 0.12);
+      --text: #F1E6DA;
+      --muted: #B09C8A;
+      --primary: #D4A373;
+      --primary-text: #1F1814;
+      --accent: #C9915F;
+      --accent-soft: #3A2C22;
+      --danger: #D0745D;
+      --line: #45372D;
+      --input-bg: rgba(35, 27, 22, 0.7);
+      --settle-bg: rgba(37, 29, 24, 0.4);
+      --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    line-height: 1.5;
+  }
+  button { font-family: inherit; }
+  /* 背景暈染色塊，讓半透明卡片透出層次 */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background:
+      radial-gradient(40vmax 40vmax at 10% 5%, var(--blob1), transparent 70%),
+      radial-gradient(35vmax 35vmax at 95% 35%, var(--blob2), transparent 70%),
+      radial-gradient(45vmax 45vmax at 30% 95%, var(--blob3), transparent 70%);
+  }
+  .glass, .card, .record, .search, .chip, .selects select, .icon-btn {
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid var(--glass-border);
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 16px 120px; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 0 12px;
+  }
+  header h1 { font-size: 1.3rem; margin: 0; color: var(--primary); letter-spacing: 1px; }
+  .icon-btn {
+    border: none; background: var(--card); color: var(--text);
+    width: 40px; height: 40px; border-radius: 50%; font-size: 1.1rem;
+    box-shadow: var(--shadow); cursor: pointer;
+  }
+
+  .card {
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 20px; margin-bottom: 16px;
+  }
+
+  /* 紀念日卡 */
+  .anniv { cursor: pointer; border-top: 4px solid var(--accent); transition: background 0.3s; }
+  .anniv.celebrate { background: color-mix(in srgb, var(--accent) 22%, var(--card)); }
+  .anniv-names { font-size: 0.95rem; color: var(--muted); }
+  .anniv-days { font-size: 2rem; font-weight: 800; color: var(--accent); letter-spacing: 1px; margin: 2px 0; }
+  .anniv-today { font-size: 1.1rem; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+  .anniv-next { font-size: 0.9rem; color: var(--muted); }
+  .anniv-list { list-style: none; margin: 14px 0 0; padding: 12px 0 0; border-top: 1px dashed var(--line); display: none; }
+  .anniv.open .anniv-list { display: block; }
+  .anniv-list li { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; font-size: 0.9rem; }
+  .anniv-list .d { color: var(--muted); white-space: nowrap; }
+  .anniv-hint { font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
+  .anniv-empty { text-align: center; }
+
+  /* 結餘卡 */
+  .balance-text { font-size: 1.5rem; font-weight: 700; margin: 4px 0 16px; }
+  .balance-text .amt { color: var(--primary); }
+  .who { font-weight: 700; }
+  .who.A { color: var(--colorA); }
+  .who.B { color: var(--colorB); }
+  .btn {
+    border: none; border-radius: 12px; padding: 10px 18px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    background: var(--primary); color: var(--primary-text);
+  }
+  .btn:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  .btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .month-nav {
+    display: flex; align-items: center; justify-content: center; gap: 12px;
+    margin-top: 16px; padding-top: 12px; border-top: 1px dashed var(--line);
+    font-size: 0.9rem; font-weight: 600; color: var(--text);
+  }
+  .nav-btn {
+    width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--line);
+    background: transparent; color: var(--text); font-size: 1.1rem; cursor: pointer; line-height: 1;
+  }
+  .nav-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+    margin-top: 10px;
+    font-size: 0.85rem; color: var(--muted); text-align: center;
+  }
+  .stats b { display: block; font-size: 1.05rem; color: var(--text); }
+
+  /* 搜尋與篩選 */
+  .search {
+    width: 100%; padding: 12px 14px; font-size: 1rem;
+    border: 1px solid var(--line); border-radius: 12px;
+    background: var(--card); color: var(--text);
+  }
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding: 10px 0 4px; scrollbar-width: none; }
+  .chip {
+    flex: none; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--line); background: var(--card); color: var(--text); font-size: 0.85rem;
+  }
+  .chip.on { background: color-mix(in srgb, var(--primary) 85%, transparent); color: var(--primary-text); border-color: transparent; }
+  .selects { display: flex; gap: 8px; margin-top: 6px; }
+  .selects select {
+    flex: 1; min-width: 0; padding: 8px 10px; font-size: 0.9rem;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--card); color: var(--text);
+  }
+  .filter-info {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 0.85rem; color: var(--muted); margin: 12px 4px 0;
+  }
+  .link-btn { background: none; border: none; color: var(--primary); font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+
+  /* 紀錄列表 */
+  .date-head { font-size: 0.85rem; color: var(--muted); margin: 20px 4px 8px; font-weight: 600; }
+  .record {
+    display: flex; align-items: center; gap: 12px; width: 100%;
+    background: var(--card); border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 10px; box-shadow: var(--shadow);
+    cursor: pointer; text-align: left; color: var(--text); font-size: 1rem;
+  }
+  .record.settle { background: var(--settle-bg); box-shadow: none; }
+  .record .ico { font-size: 1.5rem; width: 36px; text-align: center; flex: none; }
+  .record .main { flex: 1; min-width: 0; }
+  .record .title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record .sub { font-size: 0.8rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .record .money { font-weight: 700; white-space: nowrap; }
+  .tag {
+    display: inline-block; font-size: 0.75rem; padding: 1px 8px;
+    border-radius: 999px; margin-right: 6px; font-weight: 600;
+  }
+  .tag.A { background: color-mix(in srgb, var(--colorA) 20%, transparent); color: var(--colorA); border: 1px solid color-mix(in srgb, var(--colorA) 40%, transparent); }
+  .tag.B { background: color-mix(in srgb, var(--colorB) 20%, transparent); color: var(--colorB); border: 1px solid color-mix(in srgb, var(--colorB) 40%, transparent); }
+  .empty { text-align: center; color: var(--muted); padding: 32px 0; }
+
+  /* 懸浮按鈕 */
+  .fab {
+    position: fixed; right: max(16px, calc(50% - 344px)); bottom: 24px;
+    width: 60px; height: 60px; border-radius: 50%; border: none;
+    background: color-mix(in srgb, var(--primary) 88%, transparent); color: var(--primary-text);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    font-size: 2rem; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3); cursor: pointer;
+  }
+
+  /* 對話框 */
+  dialog {
+    border: none; border-radius: 20px; padding: 0;
+    width: min(440px, calc(100% - 32px)); max-height: calc(100% - 32px);
+    background: color-mix(in srgb, var(--card-solid) 88%, transparent); color: var(--text);
+    -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
+    border: 1px solid var(--glass-border);
+  }
+  dialog::backdrop { background: rgba(20, 14, 10, 0.35); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+  .dlg { padding: 24px; }
+  .dlg h2 { margin: 0 0 16px; font-size: 1.2rem; }
+  .field { margin-bottom: 14px; }
+  .field > label, .field .label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 4px; }
+  .field input[type=text], .field input[type=number], .field input[type=date], .field textarea {
+    width: 100%; padding: 10px 12px; font-size: 1rem;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--input-bg); color: var(--text); font-family: inherit;
+  }
+  .field textarea { resize: vertical; min-height: 60px; }
+  .err { color: var(--danger); font-size: 0.8rem; min-height: 1em; margin-top: 2px; }
+  .choices { display: flex; gap: 8px; flex-wrap: wrap; }
+  .choice {
+    flex: 1 1 0; min-width: 90px; padding: 10px 8px; border-radius: 12px; cursor: pointer;
+    border: 2px solid var(--line); background: var(--input-bg); color: var(--text);
+    font-size: 0.95rem; font-weight: 600; text-align: center;
+  }
+  .choice { white-space: nowrap; }
+  #fCategory .choice { flex: 1 1 auto; }
+  #fSplit { display: grid; grid-template-columns: 1fr 1fr; }
+  #fSplit .choice { min-width: 0; }
+  .choice.on { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+  .choice.payer.A.on { border-color: var(--colorA); color: var(--colorA); }
+  .choice.payer.B.on { border-color: var(--colorB); color: var(--colorB); }
+  .custom-box { margin-top: 10px; display: none; }
+  .custom-box.show { display: block; }
+  .custom-hint { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+  .preview {
+    background: var(--input-bg); border-radius: 12px; padding: 10px 12px;
+    font-size: 0.9rem; margin: 4px 0 16px; min-height: 1.5em;
+  }
+  .dlg-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+  .dlg-actions .spacer { flex: 1; }
+  .row2 { display: flex; gap: 12px; }
+  .row2 > .field { flex: 1; min-width: 0; }
+  .name-color { display: flex; gap: 8px; align-items: center; }
+  .name-color input[type=text] { flex: 1; }
+  .name-color input[type=color] {
+    width: 44px; height: 44px; padding: 2px; border: 1px solid var(--line);
+    border-radius: 10px; background: var(--input-bg); cursor: pointer; flex: none;
+  }
+  .check { display: flex; align-items: center; gap: 8px; padding: 4px 0; cursor: pointer; }
+  .check input { width: 18px; height: 18px; accent-color: var(--primary); }
+  .divider { border: none; border-top: 1px dashed var(--line); margin: 18px 0; }
+
+  /* 提示框 */
+  .toast {
+    position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%) translateY(20px);
+    background: var(--text); color: var(--bg); border-radius: 12px;
+    padding: 10px 16px; display: flex; gap: 16px; align-items: center;
+    opacity: 0; pointer-events: none; transition: all 0.25s; z-index: 20;
+    width: max-content; max-width: calc(100% - 32px);
+  }
+  .toast.show { opacity: 1; pointer-events: auto; transform: translateX(-50%) translateY(0); }
+  .toast button {
+    background: none; border: none; color: var(--accent);
+    font-weight: 700; font-size: 0.95rem; cursor: pointer;
+  }
+
+  /* 彩帶 */
+  .confetti {
+    position: fixed; top: -12px; width: 8px; height: 14px; border-radius: 2px;
+    pointer-events: none; z-index: 30; animation: fall linear forwards;
+  }
+  @keyframes fall {
+    to { transform: translateY(105vh) rotate(720deg); opacity: 0.8; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>我們的小帳本</h1>
+    <button class="icon-btn" id="btnSettings" title="設定">⚙️</button>
+  </header>
+
+  <!-- 紀念日卡 -->
+  <section class="card anniv" id="annivCard"></section>
+
+  <!-- 結餘卡 -->
+  <section class="card">
+    <div class="balance-text" id="balanceText"></div>
+    <button class="btn" id="btnSettle">結清</button>
+    <div class="month-nav">
+      <button class="nav-btn" id="btnPrevMonth" aria-label="上個月">‹</button>
+      <span id="statMonth"></span>
+      <button class="nav-btn" id="btnNextMonth" aria-label="下個月">›</button>
+    </div>
+    <div class="stats">
+      <div>總支出<b id="statTotal">$0</b></div>
+      <div><span id="statNameA"></span> 付了<b id="statA">$0</b></div>
+      <div><span id="statNameB"></span> 付了<b id="statB">$0</b></div>
+    </div>
+  </section>
+
+  <!-- 搜尋與篩選 -->
+  <section>
+    <input class="search" id="search" type="search" placeholder="搜尋項目或備註">
+    <div class="chips" id="catChips">
+      <button class="chip on" data-v="all">全部</button>
+      <button class="chip" data-v="daily">🧻 日常用品</button>
+      <button class="chip" data-v="meal">🍜 吃飯</button>
+      <button class="chip" data-v="treat">✨ 偶爾小確幸</button>
+      <button class="chip" data-v="settle">🤝 結清</button>
+    </div>
+    <div class="selects">
+      <select id="payerFilter" aria-label="付款人"></select>
+      <select id="monthFilter" aria-label="月份"></select>
+    </div>
+    <div class="filter-info" id="filterInfo"></div>
+  </section>
+
+  <div id="list"></div>
+</div>
+
+<button class="fab" id="btnAdd" title="新增支出">＋</button>
+
+<!-- 新增 / 編輯支出 -->
+<dialog id="dlgAdd">
+  <div class="dlg">
+    <h2 id="addTitle">新增支出</h2>
+    <div class="field">
+      <label for="fTitle">項目名稱</label>
+      <input id="fTitle" type="text" maxlength="15" placeholder="例：超市買衛生紙">
+      <div class="err" id="eTitle"></div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="fAmount">金額（元）</label>
+        <input id="fAmount" type="number" inputmode="numeric" min="1" max="10000" step="1" placeholder="0">
+        <div class="err" id="eAmount"></div>
+      </div>
+      <div class="field">
+        <label for="fDate">日期</label>
+        <input id="fDate" type="date">
+        <div class="err" id="eDate"></div>
+      </div>
+    </div>
+    <div class="field">
+      <span class="label">分類</span>
+      <div class="choices" id="fCategory">
+        <button type="button" class="choice" data-v="daily">🧻 日常用品</button>
+        <button type="button" class="choice" data-v="meal">🍜 吃飯</button>
+        <button type="button" class="choice" data-v="treat">✨ 偶爾小確幸</button>
+      </div>
+      <div class="err" id="eCategory"></div>
+    </div>
+    <div class="field">
+      <span class="label">誰付的錢</span>
+      <div class="choices" id="fPayer">
+        <button type="button" class="choice payer A" data-v="A"></button>
+        <button type="button" class="choice payer B" data-v="B"></button>
+      </div>
+      <div class="err" id="ePayer"></div>
+    </div>
+    <div class="field">
+      <span class="label">怎麼分</span>
+      <div class="choices" id="fSplit">
+        <button type="button" class="choice" data-v="equal">平分</button>
+        <button type="button" class="choice" data-v="self">付款人自己出</button>
+        <button type="button" class="choice" data-v="other">全算對方</button>
+        <button type="button" class="choice" data-v="custom">自訂金額</button>
+      </div>
+      <div class="custom-box" id="customBox">
+        <label for="fCustom" id="customLabel" class="custom-hint"></label>
+        <input id="fCustom" type="number" inputmode="numeric" min="0" step="1" placeholder="0" style="width:100%;padding:10px 12px;font-size:1rem;border:1px solid var(--line);border-radius:10px;background:var(--input-bg);color:var(--text);margin-top:4px">
+        <div class="custom-hint" id="customShares"></div>
+      </div>
+      <div class="err" id="eSplit"></div>
+    </div>
+    <div class="field">
+      <label for="fNote">備註（選填）</label>
+      <textarea id="fNote" maxlength="50"></textarea>
+      <div class="err" id="eNote"></div>
+    </div>
+    <div class="preview" id="preview"></div>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="btnDelete">刪除</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" id="btnCancelAdd">取消</button>
+      <button type="button" class="btn" id="btnSaveAdd">儲存</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- 設定 -->
+<dialog id="dlgSettings">
+  <div class="dlg">
+    <h2 id="settingsTitle">歡迎設定</h2>
+    <div class="field">
+      <label for="sNameA">第一位的名字與代表色</label>
+      <div class="name-color">
+        <input id="sNameA" type="text" maxlength="10" placeholder="A">
+        <input id="sColorA" type="color" aria-label="第一位的代表色">
+      </div>
+    </div>
+    <div class="field">
+      <label for="sNameB">第二位的名字與代表色</label>
+      <div class="name-color">
+        <input id="sNameB" type="text" maxlength="10" placeholder="B">
+        <input id="sColorB" type="color" aria-label="第二位的代表色">
+      </div>
+    </div>
+    <div class="field">
+      <label for="sStart">交往紀念日（在一起的第一天，可之後再設定）</label>
+      <input id="sStart" type="date">
+      <div class="err" id="eStart"></div>
+    </div>
+    <div class="field">
+      <span class="label">要追蹤的紀念日</span>
+      <label class="check"><input type="checkbox" id="sHundreds"> 百天紀念（每滿 100 天）</label>
+      <label class="check"><input type="checkbox" id="sYearly"> 週年紀念（每年同一天）</label>
+    </div>
+    <div class="dlg-actions">
+      <button type="button" class="btn danger" id="btnClearAll">清除所有資料</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn ghost" id="btnCancelSettings">取消</button>
+      <button type="button" class="btn" id="btnSaveSettings">儲存</button>
+    </div>
+  </div>
+</dialog>
+
+<!-- 確認框 -->
+<dialog id="dlgConfirm">
+  <div class="dlg">
+    <h2>確認</h2>
+    <p id="confirmMsg"></p>
+    <div class="dlg-actions">
+      <button type="button" class="btn ghost" id="btnConfirmNo">取消</button>
+      <button type="button" class="btn" id="btnConfirmYes">確定</button>
+    </div>
+  </div>
+</dialog>
+
+<div class="toast" id="toast"><span id="toastMsg"></span><button id="toastUndo">復原</button></div>
+
+<script>
+// ===== 常數與資料存取 =====
+const KEY_SETTINGS = "duoLedger.settings";
+const KEY_RECORDS = "duoLedger.records";
+const DEFAULT_COLOR = { A: "#3B6FB6", B: "#E07B39" };
+const CATEGORY = {
+  daily: { name: "日常用品", icon: "🧻" },
+  meal: { name: "吃飯", icon: "🍜" },
+  treat: { name: "偶爾小確幸", icon: "✨" }
+};
+const SPLIT_NAME = { equal: "平分", self: "付款人自己出", other: "全算對方", custom: "自訂金額" };
+const WEEK = ["日", "一", "二", "三", "四", "五", "六"];
+
+function load(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+function save(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* 預覽環境可能無法儲存，仍可在本次使用 */ }
+}
+function remove(key) {
+  try { localStorage.removeItem(key); } catch (e) { /* 同上 */ }
+}
+
+let settings = load(KEY_SETTINGS, null);
+let records = load(KEY_RECORDS, []);
+if (settings) settings = withDefaults(settings);
+
+function withDefaults(s) {
+  return {
+    nameA: "A", nameB: "B",
+    colorA: DEFAULT_COLOR.A, colorB: DEFAULT_COLOR.B,
+    startDate: null, trackHundreds: true, trackYearly: true, lastCelebrated: null,
+    ...s
+  };
+}
+function saveRecords() { save(KEY_RECORDS, records); }
+function saveSettingsData() { save(KEY_SETTINGS, settings); }
+function nameOf(who) {
+  if (!settings) return who;
+  return (who === "A" ? settings.nameA : settings.nameB) || who;
+}
+function otherOf(who) { return who === "A" ? "B" : "A"; }
+
+// ===== 日期工具（一律用本地日期）=====
+const pad = n => String(n).padStart(2, "0");
+function todayStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function dayNum(s) {
+  const [y, m, d] = s.split("-").map(Number);
+  return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+}
+function fromDayNum(n) {
+  const dt = new Date(n * 86400000);
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+function isLeap(y) { return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; }
+function weekdayOf(s) { return WEEK[new Date(dayNum(s) * 86400000).getUTCDay()]; }
+
+// ===== 一般工具 =====
+function money(n) { return "$" + n.toLocaleString("zh-TW"); }
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function newId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function whoSpan(who) { return `<span class="who ${who}">${esc(nameOf(who))}</span>`; }
+
+// ===== 分帳計算 =====
+// 回傳 { shareA, shareB }；custom 的 x = 對方（非付款人）負擔的金額
+function computeShares(amount, payer, mode, x) {
+  let payerPart, otherPart;
+  if (mode === "equal") { otherPart = Math.floor(amount / 2); payerPart = amount - otherPart; }
+  else if (mode === "self") { payerPart = amount; otherPart = 0; }
+  else if (mode === "other") { payerPart = 0; otherPart = amount; }
+  else { otherPart = x; payerPart = amount - x; }
+  return payer === "A" ? { shareA: payerPart, shareB: otherPart } : { shareA: otherPart, shareB: payerPart };
+}
+
+// balance > 0：B 欠 A；balance < 0：A 欠 B
+function calcBalance() {
+  let bal = 0;
+  for (const r of records) {
+    if (r.paidBy === "A") bal += r.shareB;
+    else bal -= r.shareA;
+  }
+  return bal;
+}
+
+// ===== 紀念日計算 =====
+function annivDateOf(startStr, years) {
+  const [y, m, d] = startStr.split("-").map(Number);
+  const yy = y + years;
+  const dd = (m === 2 && d === 29 && !isLeap(yy)) ? 28 : d;
+  return `${yy}-${pad(m)}-${pad(dd)}`;
+}
+// 回傳今天（含）之後的紀念日，依日期排序，同一天合併
+function upcomingAnniversaries(limit) {
+  if (!settings || !settings.startDate) return [];
+  const start = dayNum(settings.startDate);
+  const today = dayNum(todayStr());
+  const n = today - start + 1;
+  const map = new Map();
+  const addItem = (num, label) => {
+    if (!map.has(num)) map.set(num, { num, labels: [] });
+    map.get(num).labels.push(label);
+  };
+  if (settings.trackHundreds) {
+    const k0 = Math.max(1, Math.ceil(n / 100));
+    for (let k = k0; k < k0 + limit; k++) {
+      addItem(start + 100 * k - 1, `第 ${(100 * k).toLocaleString("zh-TW")} 天`);
+    }
+  }
+  if (settings.trackYearly) {
+    let found = 0;
+    for (let yr = 1; yr < 300 && found < limit; yr++) {
+      const num = dayNum(annivDateOf(settings.startDate, yr));
+      if (num >= today) { addItem(num, `${yr} 週年`); found++; }
+    }
+  }
+  return [...map.values()].sort((a, b) => a.num - b.num).slice(0, limit);
+}
+
+// ===== 月統計切換 =====
+let statMonth = null;
+function shiftMonth(ym, delta) {
+  let [y, m] = ym.split("-").map(Number);
+  m += delta;
+  if (m < 1) { m = 12; y--; } else if (m > 12) { m = 1; y++; }
+  return `${y}-${pad(m)}`;
+}
+
+// ===== 篩選狀態 =====
+const filter = { q: "", cat: "all", payer: "all", month: "all" };
+function isFiltering() {
+  return filter.q !== "" || filter.cat !== "all" || filter.payer !== "all" || filter.month !== "all";
+}
+function matches(r) {
+  if (filter.cat === "settle" && r.type !== "settle") return false;
+  if (filter.cat !== "all" && filter.cat !== "settle" && r.category !== filter.cat) return false;
+  if (filter.payer !== "all" && r.paidBy !== filter.payer) return false;
+  if (filter.month !== "all" && r.date.slice(0, 7) !== filter.month) return false;
+  if (filter.q) {
+    const q = filter.q.toLowerCase();
+    if (!(r.title.toLowerCase().includes(q) || (r.note || "").toLowerCase().includes(q))) return false;
+  }
+  return true;
+}
+
+// ===== 畫面更新 =====
+function applyColors() {
+  const root = document.documentElement.style;
+  root.setProperty("--colorA", settings ? settings.colorA : DEFAULT_COLOR.A);
+  root.setProperty("--colorB", settings ? settings.colorB : DEFAULT_COLOR.B);
+}
+
+function renderAnniv() {
+  const card = document.getElementById("annivCard");
+  if (!settings || !settings.startDate) {
+    card.classList.remove("celebrate", "open");
+    card.innerHTML = `<div class="anniv-empty">
+      <div class="anniv-names">${esc(nameOf("A"))} &amp; ${esc(nameOf("B"))}</div>
+      <button class="btn" id="btnSetStart" style="margin-top:10px">設定你們在一起的日子</button>
+    </div>`;
+    return;
+  }
+  const today = dayNum(todayStr());
+  const n = today - dayNum(settings.startDate) + 1;
+  const list = upcomingAnniversaries(5);
+  const isToday = list.length > 0 && list[0].num === today;
+  const next = isToday ? list[1] : list[0];
+
+  let html = `<div class="anniv-names">${esc(nameOf("A"))} &amp; ${esc(nameOf("B"))}</div>
+    <div class="anniv-days">DAY - ${n.toLocaleString("zh-TW")}</div>`;
+  if (isToday) {
+    const label = list[0].labels.join(" · ");
+    html += `<div class="anniv-today">今天是${label.startsWith("第") ? "" : " "}${label}！</div>`;
+  }
+  if (next) {
+    html += `<div class="anniv-next">下一個：${next.labels.join(" · ")} · ${fromDayNum(next.num)} · 還有 ${next.num - today} 天</div>`;
+  }
+  if (list.length > 0) {
+    html += `<ul class="anniv-list">${list.map(a => `<li>
+        <span>${a.labels.join(" · ")}</span>
+        <span class="d">${fromDayNum(a.num)}（${a.num === today ? "就是今天" : "還有 " + (a.num - today) + " 天"}）</span>
+      </li>`).join("")}</ul>
+      <div class="anniv-hint">點一下${card.classList.contains("open") ? "收合" : "查看即將到來的紀念日"}</div>`;
+  }
+  card.innerHTML = html;
+  card.classList.toggle("celebrate", isToday);
+
+  // 紀念日當天第一次開啟時播放彩帶
+  if (isToday && settings.lastCelebrated !== todayStr()) {
+    settings.lastCelebrated = todayStr();
+    saveSettingsData();
+    confetti();
+  }
+}
+
+function renderBalance() {
+  const bal = calcBalance();
+  const elBal = document.getElementById("balanceText");
+  const btnSettle = document.getElementById("btnSettle");
+  if (bal === 0) {
+    elBal.innerHTML = "🎉目前互不相欠";
+    btnSettle.disabled = true;
+  } else {
+    const debtor = bal > 0 ? "B" : "A";
+    elBal.innerHTML = `${whoSpan(debtor)} 要給 ${whoSpan(otherOf(debtor))} <span class="amt">${money(Math.abs(bal))}</span>`;
+    btnSettle.disabled = false;
+  }
+
+  // 月統計：只算支出紀錄，結清不影響；可用箭頭切換月份
+  const current = todayStr().slice(0, 7);
+  if (!statMonth || statMonth > current) statMonth = current;
+  const month = statMonth;
+  const earliest = records.reduce((m, r) => r.date.slice(0, 7) < m ? r.date.slice(0, 7) : m, current);
+  document.getElementById("btnPrevMonth").disabled = month <= earliest;
+  document.getElementById("btnNextMonth").disabled = month >= current;
+  let total = 0, paidA = 0, paidB = 0;
+  for (const r of records) {
+    if (r.type !== "expense" || r.date.slice(0, 7) !== month) continue;
+    total += r.amount;
+    if (r.paidBy === "A") paidA += r.amount; else paidB += r.amount;
+  }
+  document.getElementById("statMonth").textContent =
+    `${month.slice(0, 4)} 年 ${Number(month.slice(5))} 月${month === current ? "（本月）" : ""}`;
+  document.getElementById("statTotal").textContent = money(total);
+  document.getElementById("statA").textContent = money(paidA);
+  document.getElementById("statB").textContent = money(paidB);
+  document.getElementById("statNameA").textContent = nameOf("A");
+  document.getElementById("statNameB").textContent = nameOf("B");
+}
+
+function renderFilters() {
+  const payerSel = document.getElementById("payerFilter");
+  payerSel.innerHTML = `<option value="all">付款人：全部</option>
+    <option value="A">付款人：${esc(nameOf("A"))}</option>
+    <option value="B">付款人：${esc(nameOf("B"))}</option>`;
+  payerSel.value = filter.payer;
+
+  const months = [...new Set(records.map(r => r.date.slice(0, 7)))].sort().reverse();
+  if (filter.month !== "all" && !months.includes(filter.month)) filter.month = "all";
+  const monthSel = document.getElementById("monthFilter");
+  monthSel.innerHTML = `<option value="all">月份：全部</option>` +
+    months.map(m => `<option value="${m}">${m.slice(0, 4)} 年 ${Number(m.slice(5))} 月</option>`).join("");
+  monthSel.value = filter.month;
+
+  document.querySelectorAll("#catChips .chip").forEach(c => c.classList.toggle("on", c.dataset.v === filter.cat));
+}
+
+function dateHead(d) {
+  const today = dayNum(todayStr());
+  const n = dayNum(d);
+  const [y, m, day] = d.split("-").map(Number);
+  let text = `${m}月${day}日（${weekdayOf(d)}）`;
+  if (y !== new Date().getFullYear()) text = `${y}年` + text;
+  if (n === today) text += " · 今天";
+  else if (n === today - 1) text += " · 昨天";
+  return text;
+}
+
+function renderList() {
+  const list = document.getElementById("list");
+  const info = document.getElementById("filterInfo");
+  if (records.length === 0) {
+    info.innerHTML = "";
+    list.innerHTML = `<div class="empty">還沒有紀錄，按「＋」記下第一筆吧</div>`;
+    return;
+  }
+  const shown = records.filter(matches)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+
+  if (isFiltering()) {
+    const sumType = filter.cat === "settle" ? "settle" : "expense";
+    const sum = shown.filter(r => r.type === sumType).reduce((s, r) => s + r.amount, 0);
+    info.innerHTML = `<span>共 ${shown.length} 筆，合計 ${money(sum)}</span>
+      <button class="link-btn" id="btnClearFilter">清除篩選</button>`;
+  } else {
+    info.innerHTML = "";
+  }
+
+  if (shown.length === 0) {
+    list.innerHTML = `<div class="empty">找不到符合的紀錄</div>`;
+    return;
+  }
+
+  let html = "", lastDate = null;
+  for (const r of shown) {
+    if (r.date !== lastDate) {
+      html += `<div class="date-head">${dateHead(r.date)}</div>`;
+      lastDate = r.date;
+    }
+    if (r.type === "settle") {
+      html += `<button class="record settle" data-id="${r.id}">
+        <div class="ico">🤝</div>
+        <div class="main">
+          <div class="title">結清</div>
+          <div class="sub">${esc(nameOf(r.paidBy))} 付給 ${esc(nameOf(otherOf(r.paidBy)))}</div>
+        </div>
+        <div class="money">${money(r.amount)}</div>
+      </button>`;
+    } else {
+      const cat = CATEGORY[r.category] || { icon: "•" };
+      html += `<button class="record" data-id="${r.id}">
+        <div class="ico">${cat.icon}</div>
+        <div class="main">
+          <div class="title">${esc(r.title)}</div>
+          <div class="sub"><span class="tag ${r.paidBy}">${esc(nameOf(r.paidBy))}</span>${r.note ? esc(r.note) : ""}</div>
+        </div>
+        <div class="money">${money(r.amount)}</div>
+      </button>`;
+    }
+  }
+  list.innerHTML = html;
+}
+
+function render() {
+  applyColors();
+  renderAnniv();
+  renderBalance();
+  renderFilters();
+  renderList();
+}
+
+// ===== 彩帶動畫 =====
+function confetti() {
+  if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const colors = ["#C08552", "#8B5E3C", "#E8C39E", "#D4A373", settings.colorA, settings.colorB];
+  for (let i = 0; i < 70; i++) {
+    const c = document.createElement("div");
+    c.className = "confetti";
+    c.style.left = Math.random() * 100 + "vw";
+    c.style.background = colors[i % colors.length];
+    c.style.animationDuration = 2 + Math.random() * 1.5 + "s";
+    c.style.animationDelay = Math.random() * 0.5 + "s";
+    document.body.appendChild(c);
+    setTimeout(() => c.remove(), 4500);
+  }
+}
+
+// ===== 共用：確認框、提示框、Enter 儲存 =====
+function confirmBox(msgHtml, onYes, yesText) {
+  const dlg = document.getElementById("dlgConfirm");
+  document.getElementById("confirmMsg").innerHTML = msgHtml;
+  const yes = document.getElementById("btnConfirmYes");
+  const no = document.getElementById("btnConfirmNo");
+  yes.textContent = yesText || "確定";
+  const close = () => { dlg.close(); yes.onclick = null; no.onclick = null; };
+  yes.onclick = () => { close(); onYes(); };
+  no.onclick = close;
+  dlg.showModal();
+}
+
+let toastTimer = null;
+function showToast(msg, onUndo) {
+  const t = document.getElementById("toast");
+  document.getElementById("toastMsg").textContent = msg;
+  document.getElementById("toastUndo").onclick = () => {
+    onUndo();
+    t.classList.remove("show");
+    clearTimeout(toastTimer);
+  };
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 5000);
+}
+
+function onEnter(dlgId, fn) {
+  document.getElementById(dlgId).addEventListener("keydown", e => {
+    if (e.key === "Enter" && e.target.tagName === "INPUT" && e.target.type !== "checkbox") {
+      e.preventDefault();
+      fn();
+    }
+  });
+}
+
+// ===== 新增 / 編輯支出 =====
+const dlgAdd = document.getElementById("dlgAdd");
+const form = {
+  title: document.getElementById("fTitle"),
+  amount: document.getElementById("fAmount"),
+  date: document.getElementById("fDate"),
+  note: document.getElementById("fNote"),
+  custom: document.getElementById("fCustom")
+};
+let pick = { category: null, payer: null, split: "equal" };
+let editingId = null;
+
+function setChoice(boxId, value) {
+  document.querySelectorAll(`#${boxId} .choice`).forEach(b => b.classList.toggle("on", b.dataset.v === value));
+}
+function setupChoices(boxId, keyName) {
+  document.getElementById(boxId).addEventListener("click", e => {
+    const btn = e.target.closest(".choice");
+    if (!btn) return;
+    pick[keyName] = btn.dataset.v;
+    setChoice(boxId, btn.dataset.v);
+    updatePreview();
+  });
+}
+setupChoices("fCategory", "category");
+setupChoices("fPayer", "payer");
+setupChoices("fSplit", "split");
+
+function openAdd(rec) {
+  editingId = rec ? rec.id : null;
+  document.getElementById("addTitle").textContent = rec ? "編輯紀錄" : "新增支出";
+  document.getElementById("btnDelete").style.display = rec ? "" : "none";
+  form.title.value = rec ? rec.title : "";
+  form.amount.value = rec ? rec.amount : "";
+  form.date.value = rec ? rec.date : todayStr();
+  form.note.value = rec ? rec.note || "" : "";
+  pick = rec
+    ? { category: rec.category, payer: rec.paidBy, split: rec.splitMode || "equal" }
+    : { category: null, payer: null, split: "equal" };
+  form.custom.value = rec && rec.splitMode === "custom"
+    ? (rec.paidBy === "A" ? rec.shareB : rec.shareA)
+    : "";
+  setChoice("fCategory", pick.category);
+  setChoice("fPayer", pick.payer);
+  setChoice("fSplit", pick.split);
+  document.querySelector('#fPayer [data-v="A"]').textContent = nameOf("A");
+  document.querySelector('#fPayer [data-v="B"]').textContent = nameOf("B");
+  document.querySelectorAll("#dlgAdd .err").forEach(e => e.textContent = "");
+  updatePreview();
+  dlgAdd.showModal();
+}
+
+function parseIntIn(input, min, max) {
+  const v = String(input.value).trim();
+  if (!/^\d+$/.test(v)) return null;
+  const n = Number(v);
+  return n >= min && n <= max ? n : null;
+}
+function parseAmount() { return parseIntIn(form.amount, 1, 10000); }
+function parseCustom(amount) { return parseIntIn(form.custom, 0, amount); }
+
+function updatePreview() {
+  const amount = parseAmount();
+  const el = document.getElementById("preview");
+  const box = document.getElementById("customBox");
+  box.classList.toggle("show", pick.split === "custom");
+
+  // 自訂金額的說明
+  if (pick.split === "custom") {
+    const other = pick.payer ? otherOf(pick.payer) : null;
+    document.getElementById("customLabel").textContent = other
+      ? `${nameOf(other)} 要負擔多少？`
+      : "先選誰付的錢，再輸入對方要負擔的金額";
+    const x = amount ? parseCustom(amount) : null;
+    document.getElementById("customShares").innerHTML = (amount && pick.payer && x !== null)
+      ? `${whoSpan(pick.payer)} 負擔 ${money(amount - x)} / ${whoSpan(other)} 負擔 ${money(x)}`
+      : "";
+  }
+
+  if (!amount || !pick.payer) {
+    el.textContent = "填好金額和付款人後，這裡會顯示這筆的結果";
+    return;
+  }
+  let x = 0;
+  if (pick.split === "custom") {
+    x = parseCustom(amount);
+    if (x === null) { el.textContent = `請輸入 0 到 ${amount.toLocaleString("zh-TW")} 之間的整數`; return; }
+  }
+  const s = computeShares(amount, pick.payer, pick.split, x);
+  const other = otherOf(pick.payer);
+  const owe = other === "A" ? s.shareA : s.shareB;
+  el.innerHTML = owe === 0
+    ? `這筆全由 ${whoSpan(pick.payer)} 負擔，不會產生欠款`
+    : `這筆記完，${whoSpan(other)} 要給 ${whoSpan(pick.payer)} ${money(owe)}`;
+}
+form.amount.addEventListener("input", updatePreview);
+form.custom.addEventListener("input", updatePreview);
+
+function validate() {
+  let ok = true;
+  const setErr = (id, msg) => { document.getElementById(id).textContent = msg; if (msg) ok = false; };
+  const t = form.title.value.trim();
+  setErr("eTitle", t.length === 0 ? "請輸入項目名稱" : t.length > 15 ? "最多 15 字" : "");
+  const amount = parseAmount();
+  setErr("eAmount", amount === null ? "請輸入 1 到 10,000 之間的整數" : "");
+  setErr("eDate", form.date.value ? "" : "請選擇日期");
+  setErr("eCategory", pick.category ? "" : "請選擇分類");
+  setErr("ePayer", pick.payer ? "" : "請選擇誰付的錢");
+  let splitErr = "";
+  if (pick.split === "custom" && amount !== null && parseCustom(amount) === null) {
+    splitErr = `自訂金額需為 0 到 ${amount.toLocaleString("zh-TW")} 之間的整數`;
+  }
+  setErr("eSplit", splitErr);
+  setErr("eNote", form.note.value.length > 50 ? "最多 50 字" : "");
+  return ok;
+}
+
+function saveAdd() {
+  if (!validate()) return;
+  const amount = parseAmount();
+  const x = pick.split === "custom" ? parseCustom(amount) : 0;
+  const data = {
+    type: "expense",
+    title: form.title.value.trim(),
+    amount,
+    date: form.date.value,
+    category: pick.category,
+    paidBy: pick.payer,
+    splitMode: pick.split,
+    ...computeShares(amount, pick.payer, pick.split, x),
+    note: form.note.value.trim()
+  };
+  if (editingId) {
+    const i = records.findIndex(r => r.id === editingId);
+    if (i >= 0) records[i] = { ...records[i], ...data };
+  } else {
+    records.push({ id: newId(), ...data, createdAt: Date.now() });
+  }
+  saveRecords();
+  dlgAdd.close();
+  render();
+}
+
+function deleteRecord(rec) {
+  const label = rec.type === "settle" ? `結清 ${money(rec.amount)}` : `${rec.title} ${money(rec.amount)}`;
+  confirmBox(`確定刪除「${esc(label)}」？`, () => {
+    records = records.filter(r => r.id !== rec.id);
+    saveRecords();
+    if (dlgAdd.open) dlgAdd.close();
+    render();
+    showToast("已刪除", () => {
+      records.push(rec);
+      saveRecords();
+      render();
+    });
+  }, "刪除");
+}
+
+document.getElementById("btnSaveAdd").addEventListener("click", saveAdd);
+document.getElementById("btnCancelAdd").addEventListener("click", () => dlgAdd.close());
+document.getElementById("btnDelete").addEventListener("click", () => {
+  const rec = records.find(r => r.id === editingId);
+  if (rec) deleteRecord(rec);
+});
+document.getElementById("btnAdd").addEventListener("click", () => openAdd(null));
+onEnter("dlgAdd", saveAdd);
+
+// 點紀錄：支出開編輯，結清只能刪除
+document.getElementById("list").addEventListener("click", e => {
+  const el = e.target.closest(".record");
+  if (!el) return;
+  const rec = records.find(r => r.id === el.dataset.id);
+  if (!rec) return;
+  if (rec.type === "settle") deleteRecord(rec);
+  else openAdd(rec);
+});
+
+// ===== 一鍵結清 =====
+document.getElementById("btnSettle").addEventListener("click", () => {
+  const bal = calcBalance();
+  if (bal === 0) return;
+  const debtor = bal > 0 ? "B" : "A";
+  const creditor = otherOf(debtor);
+  const amount = Math.abs(bal);
+  confirmBox(`確定 ${whoSpan(debtor)} 已付給 ${whoSpan(creditor)} ${money(amount)}？`, () => {
+    const rec = {
+      id: newId(),
+      type: "settle",
+      title: "結清",
+      amount,
+      date: todayStr(),
+      category: null,
+      paidBy: debtor,
+      splitMode: "other",
+      shareA: debtor === "B" ? amount : 0,
+      shareB: debtor === "A" ? amount : 0,
+      note: "",
+      createdAt: Date.now()
+    };
+    records.push(rec);
+    saveRecords();
+    render();
+    showToast("已結清", () => {
+      records = records.filter(r => r.id !== rec.id);
+      saveRecords();
+      render();
+    });
+  });
+});
+
+document.getElementById("btnPrevMonth").addEventListener("click", () => { statMonth = shiftMonth(statMonth, -1); renderBalance(); });
+document.getElementById("btnNextMonth").addEventListener("click", () => { statMonth = shiftMonth(statMonth, 1); renderBalance(); });
+
+// ===== 搜尋與篩選 =====
+document.getElementById("search").addEventListener("input", e => { filter.q = e.target.value.trim(); renderList(); });
+document.getElementById("catChips").addEventListener("click", e => {
+  const c = e.target.closest(".chip");
+  if (!c) return;
+  filter.cat = c.dataset.v;
+  renderFilters();
+  renderList();
+});
+document.getElementById("payerFilter").addEventListener("change", e => { filter.payer = e.target.value; renderList(); });
+document.getElementById("monthFilter").addEventListener("change", e => { filter.month = e.target.value; renderList(); });
+document.getElementById("filterInfo").addEventListener("click", e => {
+  if (e.target.id !== "btnClearFilter") return;
+  Object.assign(filter, { q: "", cat: "all", payer: "all", month: "all" });
+  document.getElementById("search").value = "";
+  renderFilters();
+  renderList();
+});
+
+// ===== 紀念日卡互動 =====
+document.getElementById("annivCard").addEventListener("click", e => {
+  if (e.target.id === "btnSetStart") { openSettings(false); return; }
+  const card = document.getElementById("annivCard");
+  if (!settings || !settings.startDate) return;
+  card.classList.toggle("open");
+  const hint = card.querySelector(".anniv-hint");
+  if (hint) hint.textContent = card.classList.contains("open") ? "點一下收合" : "點一下查看即將到來的紀念日";
+});
+
+// ===== 設定 =====
+const dlgSettings = document.getElementById("dlgSettings");
+function openSettings(first) {
+  const s = settings || withDefaults({ nameA: "", nameB: "" });
+  document.getElementById("settingsTitle").textContent = first ? "歡迎設定" : "設定";
+  document.getElementById("sNameA").value = settings ? s.nameA : "";
+  document.getElementById("sNameB").value = settings ? s.nameB : "";
+  document.getElementById("sColorA").value = s.colorA;
+  document.getElementById("sColorB").value = s.colorB;
+  document.getElementById("sStart").value = s.startDate || "";
+  document.getElementById("sStart").max = todayStr();
+  document.getElementById("sHundreds").checked = s.trackHundreds;
+  document.getElementById("sYearly").checked = s.trackYearly;
+  document.getElementById("eStart").textContent = "";
+  document.getElementById("btnClearAll").style.display = first ? "none" : "";
+  document.getElementById("btnCancelSettings").style.display = first ? "none" : "";
+  dlgSettings.showModal();
+}
+function saveSettings() {
+  const start = document.getElementById("sStart").value || null;
+  if (start && dayNum(start) > dayNum(todayStr())) {
+    document.getElementById("eStart").textContent = "交往紀念日不能晚於今天";
+    return;
+  }
+  const oldStart = settings ? settings.startDate : null;
+  settings = withDefaults({
+    ...(settings || {}),
+    nameA: document.getElementById("sNameA").value.trim() || "A",
+    nameB: document.getElementById("sNameB").value.trim() || "B",
+    colorA: document.getElementById("sColorA").value,
+    colorB: document.getElementById("sColorB").value,
+    startDate: start,
+    trackHundreds: document.getElementById("sHundreds").checked,
+    trackYearly: document.getElementById("sYearly").checked
+  });
+  if (start !== oldStart) settings.lastCelebrated = null;
+  saveSettingsData();
+  dlgSettings.close();
+  render();
+}
+document.getElementById("btnSaveSettings").addEventListener("click", saveSettings);
+document.getElementById("btnCancelSettings").addEventListener("click", () => dlgSettings.close());
+document.getElementById("btnClearAll").addEventListener("click", () => {
+  confirmBox("確定清除所有紀錄與設定？這個動作無法復原。", () => {
+    records = [];
+    settings = null;
+    remove(KEY_RECORDS);
+    remove(KEY_SETTINGS);
+    dlgSettings.close();
+    render();
+    openSettings(true);
+  }, "全部清除");
+});
+onEnter("dlgSettings", saveSettings);
+// 第一次設定時不能用 Esc 關掉
+dlgSettings.addEventListener("cancel", e => { if (!settings) e.preventDefault(); });
+document.getElementById("btnSettings").addEventListener("click", () => openSettings(false));
+
+// ===== 啟動 =====
+render();
+if (!settings) openSettings(true);
+</script>
+</body>
+</html>
